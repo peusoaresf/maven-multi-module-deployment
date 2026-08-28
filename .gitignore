@@ -1,0 +1,18 @@
+# Maven build output
+target/
+
+# Local artifact repo for testing deploys
+.local-artifactory/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backup files from sed -i.bak
+*.bak
