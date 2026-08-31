@@ -47,28 +47,7 @@ get-pom-version:
 	@xmllint --xpath '/*[local-name()="project"]/*[local-name()="version"]/text()' $(pom)
 
 # TODO: set the version in the end?
-calculate-bumped-version:
-	@if [ -z "$(current)" ] || [ -z "$(level)" ]; then
-		echo "Missing required params, usage:\n\nmake calculate-bumped-version current=<current-version eg.: 1.0.0-SNAPSHOT> level=<one-of [major,minor,path]>\n";
-		exit 1;
-	fi;
 
-	current=$(current);
-	level=$(level);
-
-	IFS='.' read -r major minor patch <<< "$${current%-SNAPSHOT}";
-
-	case $$level in
-		patch) patch=$$((patch + 1)) ;;
-		minor) minor=$$((minor + 1)); patch=0 ;;
-		major) major=$$((major + 1)); minor=0; patch=0 ;;
-		*) echo "unknown level: $$level" >&2; exit 1 ;;
-	esac;
-
-	echo "$${major}.$${minor}.$${patch}"
-
-list-modules:
-	@grep -oE '<module>[^<]+</module>' pom.xml | sed 's/<[^>]*>//g'
 
 # strip-snapshot:
 # 	@if [ -z "$(module)" ]; then \
@@ -96,7 +75,13 @@ clean-deploy:
 	rm -rf .local-artifactory/snapshots .local-artifactory/releases
 
 
+
+
+
 # FROM THIS POINT ONWARDS this is all working really well!
+
+list-modules:
+	@grep -oE '<module>[^<]+</module>' pom.xml | sed 's/<[^>]*>//g'
 
 list-module-poms:
 	@find . -name "pom.xml" \
@@ -118,17 +103,39 @@ get-module-name-from-pom-path:
 is-already-bumped:
 	@grep -q "^$(module)=" .release-plan 2>/dev/null && echo "true" || echo "false"
 
-set-module-version:
-	@if [ -z "$(module)" ] || [ -z "$(version)" ]; then
+calculate-bump-version:
+	@if [ -z "$(current)" ] || [ -z "$(level)" ]; then
 		printf "\nMissing required params, usage:\n\n";
-		printf "make set-module-version module=<module-name> version=<new-version eg.: 1.0.0>\n\n";
+		printf "make calculate-bump-version current=<current-version eg.: 1.0.0-SNAPSHOT> level=<major|minor|path]>\n\n";
 		exit 0;
 	fi;
 
-	./mvnw versions:set -DnewVersion=$(version) -pl $(module) -DgenerateBackupPoms=false;
+	current=$(current);
+	level=$(level);
 
-	# TODO: any way to reuse this somehow?
-	# TODO: could I just call this function 'bump-module' and pass the level instead ?
+	IFS='.' read -r major minor patch <<< "$${current%-SNAPSHOT}";
+
+	case $$level in
+		patch) patch=$$((patch + 1)) ;;
+		minor) minor=$$((minor + 1)); patch=0 ;;
+		major) major=$$((major + 1)); minor=0; patch=0 ;;
+		*) echo "unknown level: $$level" >&2; exit 1 ;;
+	esac;
+
+	echo "$${major}.$${minor}.$${patch}"
+
+bump-module-version:
+	@if [ -z "$(module)" ] || [ -z "$(level)" ]; then
+		printf "\nMissing required params, usage:\n\n";
+		printf "make bump-module-version module=<module-name> level=<major|minor|patch> [plan=<true|false>]\n\n";
+		exit 0;
+	fi;
+
+	current_version=$$($(MAKE) -s get-pom-version pom=$$module/pom.xml);
+	bumped_version=$$($(MAKE) -s calculate-bump-version current=$$current_version level=$$level)-SNAPSHOT;
+
+	./mvnw versions:set -DnewVersion=$$bumped_version -pl $(module) -DgenerateBackupPoms=false;
+
 	if [ "$(plan)" = "true" ]; then
 		[ -f .release-plan ] && sed -i.bak "/^$(module)=/d" .release-plan && rm -f .release-plan.bak
 		echo "$(module)=$(level)" >> .release-plan
@@ -137,16 +144,13 @@ set-module-version:
 	for pom in $$($(MAKE) -s list-module-poms ignore=$(module)); do
 		[ "$$($(MAKE) -s does-pom-reference-module pom=$$pom module=$(module))" = "true" ] || continue;
 
-		$(MAKE) -s set-dependency-version pom=$$pom module=$(module) version=$(version);
+		$(MAKE) -s set-dependency-version pom=$$pom module=$(module) version=$$bumped_version;
 
-		dependent_module=$$($(MAKE) -s get-module-name-from-pom-path pom=$$pom);
+		dependant_module=$$($(MAKE) -s get-module-name-from-pom-path pom=$$pom);
 
-		[ "$$($(MAKE) -s is-already-bumped module=$$dependent_module)" = "false" ] || continue;
+		[ "$$($(MAKE) -s is-already-bumped module=$$dependant_module)" = "false" ] || continue;
 
-		current=$$($(MAKE) -s get-pom-version pom=$$pom);
-		bumped=$$($(MAKE) -s calculate-bumped-version current=$$current level=patch);
-
-		$(MAKE) set-module-version module=$$dependent_module version=$${bumped}-SNAPSHOT plan=$(plan) level=patch;
+		$(MAKE) bump-module-version module=$$dependant_module plan=$(plan) level=patch;
 	done
 
 msg-to-level:
@@ -179,14 +183,12 @@ is-level-upgrade:
 
 on-commit:
 	@level=$$($(MAKE) -s msg-to-level msg="$(msg)")
+
 	[ "$$level" != "none" ] || exit 0
 
 	for module in $$($(MAKE) -s list-modules); do
 		[ "$$($(MAKE) -s files-touch-module module=$$module files="$(files)")" = "true" ] || continue
 		[ "$$($(MAKE) -s is-level-upgrade module=$$module level=$$level)" = "true" ] || continue
 
-		current=$$($(MAKE) -s get-pom-version pom=$$module/pom.xml)
-		bumped=$$($(MAKE) -s calculate-bumped-version current=$$current level=$$level)
-
-		$(MAKE) set-module-version module=$$module version=$${bumped}-SNAPSHOT plan=true level=$$level
+		$(MAKE) bump-module-version module=$$module level=$$level plan=true
 	done
