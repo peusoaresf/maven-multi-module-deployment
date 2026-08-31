@@ -9,6 +9,7 @@
   <modules>
     <module>api</module>
     <module>core</module>
+    <module>scheduler</module>
   </modules>
 
   <properties>
@@ -30,19 +31,6 @@
 
   <dependencyManagement>
     <dependencies>
-      <!-- modules -->
-      <dependency>
-        <groupId>com.example</groupId>
-        <artifactId>core</artifactId>
-        <version>1.0.2-SNAPSHOT</version>
-      </dependency>
-      <dependency>
-        <groupId>com.example</groupId>
-        <artifactId>api</artifactId>
-        <version>1.0.1-SNAPSHOT</version>
-      </dependency>
-
-      <!-- thirdparty -->
       <dependency>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-dependencies</artifactId>
