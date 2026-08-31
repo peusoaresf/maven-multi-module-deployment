@@ -1,0 +1,4 @@
+.=minor
+api=minor
+core=minor
+scheduler=minor

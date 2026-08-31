@@ -134,7 +134,7 @@ bump-module-version:
 	current_version=$$($(MAKE) -s get-pom-version pom=$$module/pom.xml);
 	bumped_version=$$($(MAKE) -s calculate-bump-version current=$$current_version level=$$level)-SNAPSHOT;
 
-	./mvnw versions:set -DnewVersion=$$bumped_version -pl $(module) -DgenerateBackupPoms=false;
+	./mvnw versions:set -DnewVersion=$$bumped_version -pl $(module) -DgenerateBackupPoms=false -DupdateMatchingVersions=false;
 
 	if [ "$(plan)" = "true" ]; then
 		[ -f .release-plan ] && sed -i.bak "/^$(module)=/d" .release-plan && rm -f .release-plan.bak
@@ -175,6 +175,9 @@ level-to-num:
 files-touch-module:
 	@echo "$(files)" | tr ' ' '\n' | grep -q "^$(module)/" && echo "true" || echo "false"
 
+files-touch-root:
+	@echo "$(files)" | tr ' ' '\n' | grep -qE '^(pom\.xml|Dockerfile(\..*)?$$)' && echo "true" || echo "false"
+
 is-level-upgrade:
 	@current_level=$$(grep "^$(module)=" .release-plan 2>/dev/null | cut -d= -f2)
 	current_level_num=$$($(MAKE) -s level-to-num level=$${current_level:-none})
@@ -185,6 +188,16 @@ on-commit:
 	@level=$$($(MAKE) -s msg-to-level msg="$(msg)")
 
 	[ "$$level" != "none" ] || exit 0
+
+	# TODO: is there even a way to reuse code here and make sure the root gets resolved normally like the other modules within 'bump-module-version'?
+	if [ "$$($(MAKE) -s files-touch-root files="$(files)")" = "true" ]; then
+		[ "$$($(MAKE) -s is-level-upgrade module=. level=$$level)" = "true" ] && \
+			$(MAKE) bump-module-version module=. level=$$level plan=true
+		for module in $$($(MAKE) -s list-modules); do
+			[ "$$($(MAKE) -s is-level-upgrade module=$$module level=$$level)" = "true" ] || continue
+			$(MAKE) bump-module-version module=$$module level=$$level plan=true
+		done
+	fi
 
 	for module in $$($(MAKE) -s list-modules); do
 		[ "$$($(MAKE) -s files-touch-module module=$$module files="$(files)")" = "true" ] || continue
