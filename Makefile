@@ -2,7 +2,9 @@
 # TODO: replace all echo by printf?
 
 SHELL := /bin/bash
+MAKEFLAGS += --no-print-directory
 .ONESHELL:
+
 
 .PHONY: clean
 clean:
@@ -109,7 +111,7 @@ bump-module-version:
 	current_version=$$($(MAKE) -s get-pom-version pom=$$module/pom.xml);
 	bumped_version=$$($(MAKE) -s calculate-bump-version current=$$current_version level=$$level)-SNAPSHOT;
 
-	./mvnw versions:set -DnewVersion=$$bumped_version -pl $(module) -DgenerateBackupPoms=false -DupdateMatchingVersions=false;
+	./mvnw -q versions:set -DnewVersion=$$bumped_version -pl $(module) -DgenerateBackupPoms=false -DupdateMatchingVersions=false;
 
 	[ -f .release-plan ] && sed -i.bak "/^$(module)=/d" .release-plan && rm -f .release-plan.bak
 	echo "$(module)=$(level)" >> .release-plan
