@@ -1,6 +1,3 @@
-# TODO: refactor guard clauses
-# TODO: replace all echo by printf?
-
 SHELL := /bin/bash
 MAKEFLAGS += --no-print-directory
 .ONESHELL:
@@ -33,8 +30,8 @@ clean-deploy:
 clean-snapshot:
 	echo "Not implemented"
 
-# ################################################################
-# FROM THIS POINT ONWARDS this is all working really well!
+# ######################################################################
+# FROM THIS POINT ONWARDS this is all working really well for on-commit!
 
 list-modules:
 	@printf '.\n'
