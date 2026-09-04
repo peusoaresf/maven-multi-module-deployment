@@ -33,6 +33,10 @@ clean-snapshot:
 # ######################################################################
 # FROM THIS POINT ONWARDS this is all working really well for on-commit!
 
+.PHONY: test-makefile
+test-makefile:
+	@bash Makefile.test.sh
+
 list-modules:
 	@printf '.\n'
 	@grep -oE '<module>[^<]+</module>' pom.xml | sed 's/<[^>]*>//g'
