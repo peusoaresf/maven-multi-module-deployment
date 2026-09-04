@@ -92,3 +92,5 @@ apt-get install -y libxml2-utils
 1. `SHELL := /bin/bash` is needed to support herestring (`<<<`)
 
 2. `make msg-to-level msg="feat!: lala"` won't work but `make msg-to-level msg='feat!: lala'` will
+
+3. `@printf '%b\n' "$(files)"` is required to preserve \n as proper newline (instead of being interpreted as literal characters)

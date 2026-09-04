@@ -81,6 +81,7 @@ clean-deploy:
 # FROM THIS POINT ONWARDS this is all working really well!
 
 list-modules:
+	@printf '.\n'
 	@grep -oE '<module>[^<]+</module>' pom.xml | sed 's/<[^>]*>//g'
 
 list-module-poms:
@@ -92,7 +93,12 @@ list-module-poms:
 		-not -path "./.local-artifactory/*"
 
 does-pom-reference-module:
-	@grep -q "<artifactId>$(module)<\/artifactId>" "$(pom)" && echo "true" || echo "false"
+	@if [ "$(module)" = "." ]; then
+		echo "true"
+		exit 0
+	fi
+
+	grep -q "<artifactId>$(module)<\/artifactId>" "$(pom)" && echo "true" || echo "false"
 
 set-dependency-version:
 	@sed -i.bak "/<artifactId>$(module)<\/artifactId>/{n;s|<version>[^<]*</version>|<version>$(version)</version>|;}" $(pom) && rm $(pom).bak
@@ -141,14 +147,18 @@ bump-module-version:
 		echo "$(module)=$(level)" >> .release-plan
 	fi
 
-	for pom in $$($(MAKE) -s list-module-poms ignore=$(module)); do
-		[ "$$($(MAKE) -s does-pom-reference-module pom=$$pom module=$(module))" = "true" ] || continue;
+	for other_pom in $$($(MAKE) -s list-module-poms ignore=$(module)); do
+		if [ "$$($(MAKE) -s does-pom-reference-module pom=$$other_pom module=$(module))" = "false" ]; then
+			continue;
+		fi
 
-		$(MAKE) -s set-dependency-version pom=$$pom module=$(module) version=$$bumped_version;
+		$(MAKE) -s set-dependency-version pom=$$other_pom module=$(module) version=$$bumped_version;
 
-		dependant_module=$$($(MAKE) -s get-module-name-from-pom-path pom=$$pom);
+		dependant_module=$$($(MAKE) -s get-module-name-from-pom-path pom=$$other_pom);
 
-		[ "$$($(MAKE) -s is-already-bumped module=$$dependant_module)" = "false" ] || continue;
+		if [ "$$($(MAKE) -s is-already-bumped module=$$dependant_module)" = "true" ]; then
+			continue;
+		fi
 
 		$(MAKE) bump-module-version module=$$dependant_module plan=$(plan) level=patch;
 	done
@@ -158,7 +168,7 @@ msg-to-level:
 		echo major
 	elif echo "$(msg)" | grep -qE '^feat(\(.+\))?:'; then
 		echo minor
-	elif echo "$(msg)" | grep -qE '^(fix|refactor|deps)(\(.+\))?:'; then
+	elif echo "$(msg)" | grep -qE '^(fix|build|refactor|deps)(\(.+\))?:'; then
 		echo patch
 	else
 		echo none
@@ -172,11 +182,16 @@ level-to-num:
 		*) echo 0 ;;
 	esac
 
-files-touch-module:
-	@echo "$(files)" | tr ' ' '\n' | grep -q "^$(module)/" && echo "true" || echo "false"
-
 files-touch-root:
-	@echo "$(files)" | tr ' ' '\n' | grep -qE '^(pom\.xml|Dockerfile(\..*)?$$)' && echo "true" || echo "false"
+	@printf '%b\n' "$(files)" | tr ' ' '\n' | grep -qE '^(pom\.xml|Dockerfile(\..*)?$$)' && echo "true" || echo "false"
+
+files-touch-module:
+	@if [ "$(module)" = "." ]; then
+		$(MAKE) -s files-touch-root files="$(files)"
+		exit 0
+	fi
+
+	printf '%b\n' "$(files)" | tr ' ' '\n' | grep -q "^$(module)/" && echo "true" || echo "false"
 
 is-level-upgrade:
 	@current_level=$$(grep "^$(module)=" .release-plan 2>/dev/null | cut -d= -f2)
@@ -187,21 +202,19 @@ is-level-upgrade:
 on-commit:
 	@level=$$($(MAKE) -s msg-to-level msg="$(msg)")
 
-	[ "$$level" != "none" ] || exit 0
-
-	# TODO: is there even a way to reuse code here and make sure the root gets resolved normally like the other modules within 'bump-module-version'?
-	if [ "$$($(MAKE) -s files-touch-root files="$(files)")" = "true" ]; then
-		[ "$$($(MAKE) -s is-level-upgrade module=. level=$$level)" = "true" ] && \
-			$(MAKE) bump-module-version module=. level=$$level plan=true
-		for module in $$($(MAKE) -s list-modules); do
-			[ "$$($(MAKE) -s is-level-upgrade module=$$module level=$$level)" = "true" ] || continue
-			$(MAKE) bump-module-version module=$$module level=$$level plan=true
-		done
+	if [ "$$level" = "none" ]; then
+		printf "Skipping version bumps: commit message does not require one.\n";
+		exit 0
 	fi
 
 	for module in $$($(MAKE) -s list-modules); do
-		[ "$$($(MAKE) -s files-touch-module module=$$module files="$(files)")" = "true" ] || continue
-		[ "$$($(MAKE) -s is-level-upgrade module=$$module level=$$level)" = "true" ] || continue
+		if [ "$$($(MAKE) -s files-touch-module module=$$module files="$(files)")" = "false" ]; then
+			continue
+		fi
+
+		if [ "$$($(MAKE) -s is-level-upgrade module=$$module level=$$level)" = "false" ]; then
+			continue
+		fi
 
 		$(MAKE) bump-module-version module=$$module level=$$level plan=true
 	done
