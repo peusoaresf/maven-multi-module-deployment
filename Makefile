@@ -1,3 +1,22 @@
+# TODO: urgent fix none not being recognized, eg
+
+# 1. When .release-plan is
+
+# scheduler=patch
+# .=none
+# core=none
+# api=none
+
+# 2. and commit trigger action is:
+
+# make on-commit msg="feat: shared config changed" files="Dockerfile"
+
+# 3. modules with none dont receive a proper patch
+
+
+# TODO: refactor guard clauses
+# TODO: replace all echo by printf?
+
 SHELL := /bin/bash
 .ONESHELL:
 
@@ -21,63 +40,14 @@ deploy:
 
 	./mvnw deploy -pl $(modules) -am
 
-# set-module-version:
-# 	@if [ -z "$(module)" ] || [ -z "$(version)" ]; then \
-# 		echo "Missing required params, usage:\n\nmake set-module-version module=<module-name> version=<new-version eg.: 1.0.0>\n"; \
-# 		exit 1; \
-# 	fi;
-
-# 	./mvnw versions:set -DnewVersion=$(version) -pl $(module) -DgenerateBackupPoms=false
-# 	sed -i.bak "/<artifactId>$(module)<\/artifactId>/{n;s|<version>[^<]*</version>|<version>$(version)</version>|;}" pom.xml && rm pom.xml.bak
-
-set-parent-version-cascade:
-	@if [ -z "$(version)" ]; then \
-		echo "Missing required params, usage:\n\nmake set-parent-version-cascade version=<new-parent-version eg.: 1.0.0>\n"; \
-		exit 1; \
-	fi;
-
-	./mvnw versions:set -DnewVersion=$(version) -DgenerateBackupPoms=false
-
-get-pom-version:
-	@if [ -z "$(pom)" ]; then \
-		echo "Missing required params, usage:\n\nmake get-pom-version pom=<path/to/pom.xml>\n"; \
-		exit 1; \
-	fi;
-
-	@xmllint --xpath '/*[local-name()="project"]/*[local-name()="version"]/text()' $(pom)
-
-# TODO: set the version in the end?
-
-
-# strip-snapshot:
-# 	@if [ -z "$(module)" ]; then \
-# 		echo "Missing required params, usage:\n\nmake strip-snapshot module=<module-name>\n"; \
-# 		exit 1; \
-# 	fi; \
-# 	current=$$(make get-pom-version pom=$(module)/pom.xml); \
-# 	make set-module-version module=$(module) version=$${current%-SNAPSHOT}
-
-# add-snapshot:
-# 	@if [ -z "$(module)" ]; then \
-# 		echo "Missing required params, usage:\n\nmake add-snapshot module=<module-name>\n"; \
-# 		exit 1; \
-# 	fi; \
-# 	current=$$(make get-pom-version pom=$(module)/pom.xml); \
-# 	make set-module-version module=$(module) version=$${current%-SNAPSHOT}-SNAPSHOT
-
-remove-snapshot:
-	./mvnw versions:set -DremoveSnapshot -pl $(module) -DgenerateBackupPoms=false
-
-next-snapshot:
-	./mvnw versions:set -DnextSnapshot -pl $(module) -DgenerateBackupPoms=false
-
 clean-deploy:
 	rm -rf .local-artifactory/snapshots .local-artifactory/releases
 
+# TODO: I can clean snapshots in one shot with a string replace tbh
+clean-snapshot:
+	echo "Not implemented"
 
-
-
-
+# ################################################################
 # FROM THIS POINT ONWARDS this is all working really well!
 
 list-modules:
@@ -91,6 +61,14 @@ list-module-poms:
 		-not -path "./.m2/*" \
 		-not -path "./target/*" \
 		-not -path "./.local-artifactory/*"
+
+get-pom-version:
+	@if [ -z "$(pom)" ]; then \
+		echo "Missing required params, usage:\n\nmake get-pom-version pom=<path/to/pom.xml>\n"; \
+		exit 1; \
+	fi;
+
+	@xmllint --xpath '/*[local-name()="project"]/*[local-name()="version"]/text()' $(pom)
 
 does-pom-reference-module:
 	@if [ "$(module)" = "." ]; then
