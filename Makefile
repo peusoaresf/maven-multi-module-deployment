@@ -102,7 +102,7 @@ calculate-bump-version:
 bump-module-version:
 	@if [ -z "$(module)" ] || [ -z "$(level)" ]; then
 		printf "\nMissing required params, usage:\n\n";
-		printf "make bump-module-version module=<module-name> level=<major|minor|patch> [plan=<true|false>]\n\n";
+		printf "make bump-module-version module=<module-name> level=<major|minor|patch>\n\n";
 		exit 0;
 	fi;
 
@@ -111,10 +111,8 @@ bump-module-version:
 
 	./mvnw versions:set -DnewVersion=$$bumped_version -pl $(module) -DgenerateBackupPoms=false -DupdateMatchingVersions=false;
 
-	if [ "$(plan)" = "true" ]; then
-		[ -f .release-plan ] && sed -i.bak "/^$(module)=/d" .release-plan && rm -f .release-plan.bak
-		echo "$(module)=$(level)" >> .release-plan
-	fi
+	[ -f .release-plan ] && sed -i.bak "/^$(module)=/d" .release-plan && rm -f .release-plan.bak
+	echo "$(module)=$(level)" >> .release-plan
 
 	for other_pom in $$($(MAKE) -s list-module-poms ignore=$(module)); do
 		if [ "$$($(MAKE) -s does-pom-reference-module pom=$$other_pom module=$(module))" = "false" ]; then
@@ -129,7 +127,7 @@ bump-module-version:
 			continue;
 		fi
 
-		$(MAKE) bump-module-version module=$$dependant_module plan=$(plan) level=patch;
+		$(MAKE) bump-module-version module=$$dependant_module level=patch;
 	done
 
 msg-to-level:
@@ -164,9 +162,16 @@ files-touch-module:
 
 is-level-upgrade:
 	@current_level=$$(grep "^$(module)=" .release-plan 2>/dev/null | cut -d= -f2)
-	current_level_num=$$($(MAKE) -s level-to-num level=$${current_level:-none})
-	new_level_num=$$($(MAKE) -s level-to-num level=$(level))
-	[ "$$new_level_num" -gt "$$current_level_num" ] && echo "true" || echo "false"
+
+	current_level_rank=$$($(MAKE) -s level-to-num level=$${current_level:-none})
+	new_level_rank=$$($(MAKE) -s level-to-num level=$(level))
+
+	if [ "$$new_level_rank" -gt "$$current_level_rank" ]; then
+		echo "true"
+		exit 0
+	fi
+
+	echo "false"
 
 on-commit:
 	@level=$$($(MAKE) -s msg-to-level msg="$(msg)")
@@ -185,5 +190,5 @@ on-commit:
 			continue
 		fi
 
-		$(MAKE) bump-module-version module=$$module level=$$level plan=true
+		$(MAKE) bump-module-version module=$$module level=$$level
 	done
