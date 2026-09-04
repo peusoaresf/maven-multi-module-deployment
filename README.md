@@ -94,3 +94,10 @@ apt-get install -y libxml2-utils
 2. `make msg-to-level msg="feat!: lala"` won't work but `make msg-to-level msg='feat!: lala'` will
 
 3. `@printf '%b\n' "$(files)"` is required to preserve \n as proper newline (instead of being interpreted as literal characters)
+
+4. `MAKEFLAGS += --no-print-directory` prevents recursive call logs such as:
+
+```
+make[1]: Entering directory '/Users/ferraped/Projects/personal/maven-multi-module-deployment'
+make[1]: Leaving directory '/Users/ferraped/Projects/personal/maven-multi-module-deployment'
+```

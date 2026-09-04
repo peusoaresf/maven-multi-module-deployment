@@ -101,6 +101,14 @@ calculate-bump-version:
 
 	echo "$${major}.$${minor}.$${patch}"
 
+update-release-plan:
+	if [ -f .release-plan ]; then
+		sed -i.bak "/^$(module)=/d" .release-plan
+		rm -f .release-plan.bak
+	fi
+
+	echo "$(module)=$(level)" >> .release-plan
+
 bump-module-version:
 	@if [ -z "$(module)" ] || [ -z "$(level)" ]; then
 		printf "\nMissing required params, usage:\n\n";
@@ -113,8 +121,7 @@ bump-module-version:
 
 	./mvnw -q versions:set -DnewVersion=$$bumped_version -pl $(module) -DgenerateBackupPoms=false -DupdateMatchingVersions=false;
 
-	[ -f .release-plan ] && sed -i.bak "/^$(module)=/d" .release-plan && rm -f .release-plan.bak
-	echo "$(module)=$(level)" >> .release-plan
+	$(MAKE) -s update-release-plan module=$(module) level=$(level)
 
 	for other_pom in $$($(MAKE) -s list-module-poms ignore=$(module)); do
 		if [ "$$($(MAKE) -s does-pom-reference-module pom=$$other_pom module=$(module))" = "false" ]; then
@@ -176,6 +183,12 @@ is-level-upgrade:
 	echo "false"
 
 on-commit:
+	@if [ -z "$(msg)" ] || [ -z "$(files)" ]; then
+		printf "\nMissing required params, usage:\n\n";
+		printf "make on-commit msg='commit-msg' files='file-path1.txt file/path2.xml'\n\n";
+		exit 0;
+	fi;
+
 	@level=$$($(MAKE) -s msg-to-level msg="$(msg)")
 
 	if [ "$$level" = "none" ]; then
