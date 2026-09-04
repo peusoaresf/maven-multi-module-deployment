@@ -65,6 +65,8 @@ does-pom-reference-module:
 	grep -q "<artifactId>$(module)<\/artifactId>" "$(pom)" && echo "true" || echo "false"
 
 set-dependency-version:
+	printf " \- Setting <$$module:$$version> in <$$pom>\n"
+
 	@sed -i.bak "/<artifactId>$(module)<\/artifactId>/{n;s|<version>[^<]*</version>|<version>$(version)</version>|;}" $(pom) && rm $(pom).bak
 
 get-module-name-from-pom-path:
@@ -119,12 +121,17 @@ bump-module-version:
 	current_version=$$($(MAKE) -s get-pom-version pom=$$module/pom.xml);
 	bumped_version=$$($(MAKE) -s calculate-bump-version current=$$current_version level=$$level)-SNAPSHOT;
 
+	printf "Bumping <$$module> from <$$current_version> to <$$bumped_version>\n"
+
 	./mvnw -q versions:set -DnewVersion=$$bumped_version -pl $(module) -DgenerateBackupPoms=false -DupdateMatchingVersions=false;
 
 	$(MAKE) -s update-release-plan module=$(module) level=$(level)
 
 	for other_pom in $$($(MAKE) -s list-module-poms ignore=$(module)); do
+		printf "Analyzing potential references to <$$module> in <$$other_pom>\n"
+
 		if [ "$$($(MAKE) -s does-pom-reference-module pom=$$other_pom module=$(module))" = "false" ]; then
+			printf " \- Skipping dependant bumps since <$$other_pom> does not reference $$module\n"
 			continue;
 		fi
 
@@ -133,6 +140,7 @@ bump-module-version:
 		dependant_module=$$($(MAKE) -s get-module-name-from-pom-path pom=$$other_pom);
 
 		if [ "$$($(MAKE) -s is-already-bumped module=$$dependant_module)" = "true" ]; then
+			printf " \- Skipping auto-cascading patch to <$$dependant_module> since it already received a higher or equal rank bump in a previous commit\n"
 			continue;
 		fi
 
@@ -196,12 +204,19 @@ on-commit:
 		exit 0
 	fi
 
+	printf "Planning version bumps for level <$$level>\n"
+
 	for module in $$($(MAKE) -s list-modules); do
+		printf "\n================================================================================="
+		printf "\nEvaluating module <$$module>\n"
+
 		if [ "$$($(MAKE) -s files-touch-module module=$$module files="$(files)")" = "false" ]; then
+			printf "Skipping module <$$module> since no changes have been performed on it\n"
 			continue
 		fi
 
 		if [ "$$($(MAKE) -s is-level-upgrade module=$$module level=$$level)" = "false" ]; then
+			printf "Skipping module <$$module> since it already received a higher or equal rank bump in a previous commit\n"
 			continue
 		fi
 
