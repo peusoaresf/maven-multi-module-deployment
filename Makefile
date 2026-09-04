@@ -1,19 +1,3 @@
-# TODO: urgent fix none not being recognized, eg
-
-# 1. When .release-plan is
-
-# scheduler=patch
-# .=none
-# core=none
-# api=none
-
-# 2. and commit trigger action is:
-
-# make on-commit msg="feat: shared config changed" files="Dockerfile"
-
-# 3. modules with none dont receive a proper patch
-
-
 # TODO: refactor guard clauses
 # TODO: replace all echo by printf?
 
@@ -85,7 +69,14 @@ get-module-name-from-pom-path:
 	@dirname "$(pom)" | sed 's|^\./||'
 
 is-already-bumped:
-	@grep -q "^$(module)=" .release-plan 2>/dev/null && echo "true" || echo "false"
+	@level=$$(grep "^$(module)=" .release-plan | cut -d= -f2)
+
+	if [ -n "$$level" ] && [ "$$level" != "none" ]; then
+		echo "true"
+		exit 0
+	fi
+
+	echo "false"
 
 calculate-bump-version:
 	@if [ -z "$(current)" ] || [ -z "$(level)" ]; then
