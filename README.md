@@ -65,18 +65,17 @@ make on-commit msg="feat: shared config changed" files="Dockerfile"
 
 At this point, we could most likely safely hook the current `on-commit` recipe to a github action reacting to pushes to main and get a pretty consistent versioning resolution going on, a few high-level missing steps to make this a full-blown deployment pipeline would be:
 
-- try to handle root project much like children modules, thus avoiding the awkward explicit root check during `on-commit`
 - commit back to main all snapshot bumps incurred by `on-commit` ;
 - create a new hook `on-release` that would:
-1. Strip SNAPSHOT from all pom.xml files
-2. Read changed modules in `.release-plan`
-3. Build & Deploy them to: 
-    a. artifactory
-    b. harbor
-    c. argocd_apps
-4. Rollback snapshot stripping
-5. Generate a github release at the latest hash including commits, contributors and the deployed modules (+ their levels)
-6. Set all modules = none in the `.release-plan` file 
+  1. Strip SNAPSHOT from all pom.xml files
+  2. Read changed modules in `.release-plan`
+  3. Build & Deploy them to: 
+      a. artifactory
+      b. harbor
+      c. argocd_apps
+  4. Rollback snapshot stripping
+  5. Generate a github release at the latest hash including commits, contributors and the deployed modules (+ their levels)
+  6. Set all modules = none in the `.release-plan` file 
 
 
 ## Dependencies & Blockers
