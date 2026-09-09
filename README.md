@@ -1,6 +1,31 @@
-## Context
+# Maven Multi-Module Deployment
 
 This repo explores maven multi-module projects and attempts to set in place a smooth release process around it.
+
+## Dependencies
+
+- [Make](https://www.gnu.org/software/make/)
+- [Java SDK (v25)](https://sdkman.io/)
+
+## Getting Start
+
+This repo setups up an imaginary application consisting of an `api` and a `scheduler` modules, that both depend on a `core` module.
+
+To start the api, run:
+
+```
+make spring-run module=api
+```
+
+Aand then, to issue test requests, simply:
+
+```
+curl http://localhost:8080/greet/world
+```
+
+The actual app code or functionalities are non-important, since this repo is focused on the build system / release process around such a modularized service.
+
+## More Context
 
 As I came to learn, multi-module maven projects are quite a simple concept (and at a basic level, also simple to implement) but properly automating and orchestrating versioning / releases is a bit of a different beast.
 
@@ -65,8 +90,8 @@ make on-commit msg="feat: shared config changed" files="Dockerfile"
 
 At this point, we could most likely safely hook the current `on-commit` recipe to a github action reacting to pushes to main and get a pretty consistent versioning resolution going on, a few high-level missing steps to make this a full-blown deployment pipeline would be:
 
-- commit back to main all snapshot bumps incurred by `on-commit` ;
-- create a new hook `on-release` that would:
+- Commit back to main all snapshot bumps incurred by `on-commit` ;
+- Create a new hook `on-release` that would:
   1. Strip SNAPSHOT from all pom.xml files
   2. Read changed modules in `.release-plan`
   3. Build & Deploy them to: 
